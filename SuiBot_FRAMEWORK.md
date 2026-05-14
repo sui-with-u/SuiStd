@@ -1,8 +1,9 @@
 # SuiBot 正式框架文档 v3.4
 
 > **SuiBot：基于 LLM 的拟人化智能体——正式框架概述**
-> sui-with-u 穗穗碎碎念
+> sui-with-u 组织
 > 文档版本：v3.4 · 2026.05
+> 版权：PolyForm Noncommercial License 1.0.0
 
 ---
 
@@ -37,16 +38,16 @@
   - [5.4 通信流示例](#54-通信流示例)
   - [5.5 SDK 快速参考](#55-sdk-快速参考)
   - [5.6 错误码表](#56-错误码表)
-- [第六章：Vibe Coding 规范——AI 编码规范（修订版）](#第六章vibe-coding-规范ai-编码规范修订版)
-  - [6.1 什么是 UOP](#61-什么是-uop)
+- [第六章：编码规范](#第六章编码规范)
+  - [6.1 核心原则](#61-核心原则)
   - [6.2 命名规范](#62-命名规范)
   - [6.3 注释规范](#63-注释规范)
   - [6.4 函数规范](#64-函数规范)
   - [6.5 文件与目录规范](#65-文件与目录规范)
   - [6.6 性能与视觉规范](#66-性能与视觉规范)
   - [6.7 复用规范](#67-复用规范)
-  - [6.8 SuiBot 项目落地示例](#68-suibot-项目落地示例)
-  - [6.9 给 AI 的提示词（直接复制使用）](#69-给-ai-的提示词直接复制使用)
+  - [6.8 架构规范：纯函数优先，组合优于继承](#68-架构规范纯函数优先组合优于继承)
+  - [6.9 落地示例：emotion-engine.ts](#69-落地示例emotion-enginets)
 - [附录 A：组织仓库总览](#附录-a组织仓库总览)
 - [附录 B：变更历史](#附录-b变更历史)
 - [附录 C：快捷指令表](#附录-c快捷指令表)
@@ -1375,142 +1376,144 @@ await client.wait_forever()
 
 ---
 
-## 第六章：Vibe Coding 规范——AI 编码规范（修订版）
+## 第六章：编码规范
 
 > 本章规范适用于所有参与 SuiBot 开发的成员，无论是自己写代码还是用 AI 生成代码（Vibe Coding）。
-> 基于 UOP（面向理解编程）修订，结合 SuiBot 项目实际情况调整。
-> UOP 原始规范：[github.com/kernel4632/UOP](https://github.com/kernel4632/UOP)
-> 独立规范文件：见项目根目录 `claude.md`
+> 整合自 UOP（面向理解编程）与 HOP（面向人类编程），结合项目实际修订。
+> 独立规范文件：见项目根目录 `claude.md`（可直接粘贴到 Cursor / Trae 规则中）。
 
-### 6.1 什么是 UOP
+### 6.1 核心原则
 
-**UOP（Understanding-Oriented Programming，面向理解编程）** 把「任意背景的人能快速读懂」作为代码的第一优先级。
+**让刚接触项目的人只看局部代码就能理解、上手、修改。**
 
-这不是要求代码写得烂。恰恰相反——真正成熟的 UOP 追求更高的长期可维护性、更强的复用性、更低的整体心智负担。它把「理解成本」放在首位，但其余工程指标在这个前提下优化，而不是被牺牲。
+代码即文档，文件头就是使用手册，注释就是教学材料，命名就是说明书。
+优先级排序：**可读性 > 性能 > 视觉美观**（热路径除外，热路径性能优先）。
 
-**为什么 SuiBot 要用 UOP？**
+#### 架构思想：触发 → 指令 → 数据 → 反馈
 
-SuiBot 是高中生研究性学习项目，团队成员编程基础参差不齐。项目大量使用 AI（Cursor、Trae 等）辅助开发，AI 生成的代码专业但对新手难以 review。UOP 确保：
+所有业务流程按这条链条组织，让数据流动清晰可追踪：
 
-- 组员都能看懂核心代码在做什么
-- AI 生成代码符合统一风格
-- 半年后回来改代码，不需要从头理解
+```
+外部触发（CLI / WebUI / Hand 消息）
+    ↓
+Core 接收并路由（触发层，只判断谁触发了什么）
+    ↓
+引擎 / Manager 执行具体业务（指令层，完成一次清楚的业务动作）
+    ↓
+状态数据被修改（数据层，显式读写，可追踪）
+    ↓
+回复下发 / 状态广播（反馈层，把结果交回调用者）
+```
 
-**SuiBot 对原版 UOP 的修订：**
-
-| 维度 | 原版 UOP | SuiBot 修订版 |
-|------|----------|--------------|
-| 命名 | 理解优先，可放宽规范 | 理解优先，**规范强制**，不可因「好理解」破坏大小写规则 |
-| 注释 | 所有紧凑写法都加注释 | 必要位置必须写，普通清晰代码不强制 |
-| 视觉 | 不提及 | 少量性能可换视觉，**性能 > 视觉** |
-| 文件组织 | 平铺为主，最多两层 | 遵循 TypeScript 社区标准，不强制平铺 |
-| 复用 | 出现两次再提取 | 遵循标准工程规范，可预见复用提前提取 |
+任何人看到一个事件触发，都能顺着链条找到：调用了哪个方法 → 读写了哪些数据 → 最终影响了什么。
 
 ---
 
 ### 6.2 命名规范
 
-#### 大小写规则（强制，不可违反）
-
-遵循 TypeScript / JavaScript 社区标准：
+#### 大小写规则（强制）
 
 | 场景 | 规则 | 示例 |
 |------|------|------|
-| 变量、函数 | camelCase（小驼峰） | `currentPAD`、`applyDelta`、`getUserInfo` |
-| 类、接口、类型 | PascalCase（大驼峰） | `EmotionEngine`、`HandManager`、`PADVector` |
+| 变量、函数 | camelCase（小驼峰） | `currentPAD`、`applyDelta` |
+| 类、接口、类型 | PascalCase（大驼峰） | `EmotionEngine`、`PADVector` |
 | 模块级常量 | SCREAMING_SNAKE_CASE | `DECAY_LAMBDA`、`MAX_RETRY` |
 | 文件名 | kebab-case | `emotion-engine.ts`、`hand-manager.ts` |
-| 文件夹名 | kebab-case | `core-engines/`、`tool-manager/` |
+| 文件夹名 | kebab-case | `engines/`、`hand-manager/` |
 
-> **命名要符合直觉，但规范优先。** 不能因为「更好理解」就用 `emotionengine` 代替 `EmotionEngine`，规范本身就是直觉的一部分。
+#### 缩写规则（HOP 规范，强制）
 
-#### 函数命名
+约定俗成的缩写必须作为整体保留，**禁止写成首字母大写其余小写的假单词**：
 
-用「动词 + 名词」，一眼知道在做什么：
+| 场景 | 正确 ✅ | 错误 ❌ |
+|------|---------|---------|
+| 缩写单独出现或在开头 | `id`、`url`、`api`、`json`、`pad` | — |
+| 缩写在普通单词后面 | `userID`、`fileURL`、`parseJSON`、`currentPAD` | `userId`、`parseJson`、`currentPad` |
+| 类名或专有名称 | `PADVector`、`JSONData`、`HandManager` | `PadVector`、`JsonData` |
 
-```typescript
-// ✅
-sendReply()
-buildSystemPrompt()
-applyEmotionDelta()
-getMemoryContext()
-checkConnectionAlive()
+允许的缩写：`id`、`url`、`api`、`http`、`json`、`sse`、`sql`、`pad`、`llm`、`tts`、`ws`。
+禁止不常见缩写：`mgr`、`cfg`、`svc`、`repo`、`proc`。
 
-// ❌ 动词不明确
-emotion()
-prompt()
-memory()
-```
+#### 函数与变量命名
 
-首选动词：`get / set / add / remove / update / build / send / check / apply / load / save / init`
-
-#### 变量命名
-
-布尔变量写成疑问句形式：
-
-```typescript
-isConnected    isProcessing    hasPermission    canRetry
-```
-
-用完整常见英语单词，`id`、`api`、`url`、`PAD` 等约定俗成的缩写保留：
-
-```typescript
-// ✅
-const manager = new HandManager()
-const result = await callLLM(prompt)
-
-// ❌
-const mgr = new HandManager()
-const res = await callLLM(pmt)
-```
+- 函数名用「动词 + 名词」，首选动词：`get / set / add / remove / update / build / send / check / apply / load / save / init`
+- 布尔变量用 `is / has / can / should` 开头：`isConnected`、`hasPermission`、`canRetry`
+- 变量名直接说是什么：`currentPAD`、`retentionProb`、`minutesPassed`
 
 ---
 
 ### 6.3 注释规范
 
-注释不用每一行都写，但以下情况**必须写**：
+#### 文件头注释（每个文件必须有）
 
-**1. 非显而易见的业务逻辑**
+用自然语言直接描述：这个文件做什么、设计思想、重要方法、调用示例、注意事项。
+**不用标注格式**（不写「负责什么」「主要方法」），调用示例必须完整真实：
 
 ```typescript
-// PAD 三个维度都要 clamp，情绪值不能超出 [-1, 1]，否则后续衰减计算会溢出
-currentPAD.P = clamp(currentPAD.P + delta.P * sensitivity, -1, 1)
+// emotion-engine.ts
+//
+// 管穗穗的情绪状态。情绪用 PAD 三维坐标表示（愉悦度/激活度/支配度，各在 [-1,1]）。
+// 每次对话叠加情感波动，同时随时间指数衰减回基准值，模拟人类情绪的自然消退。
+//
+// 调用示例：
+//   const state = getCurrentState()          // { pad: {...}, label: "轻松愉快" }
+//   applyDelta({ P: 0.3, A: 0.1, D: 0.0 })  // 叠加一次对话带来的情绪变化
+//   decay(30)                                // 经过 30 分钟后的情绪衰减
+//   setPAD({ P: 0.5, A: 0.3, D: 0.0 })      // 手动设置（调试 / 剧本模式）
 ```
 
-**2. 魔法数字和魔法字符串**
+#### 尾随注释 vs 行注释
+
+两种注释各有用途：
+
+```typescript
+// 尾随注释：一行注释对应一行代码，紧凑排列，形成流程整体，不留空行
+const factor = Math.exp(-DECAY_LAMBDA * minutesPassed)  // 衰减因子 e^(-λt)，t 越大越接近 0
+currentPAD.P = BASELINE_PAD.P + (currentPAD.P - BASELINE_PAD.P) * factor  // P 向基准值靠拢
+currentPAD.A = BASELINE_PAD.A + (currentPAD.A - BASELINE_PAD.A) * factor  // A 同理
+currentPAD.D = BASELINE_PAD.D + (currentPAD.D - BASELINE_PAD.D) * factor  // D 同理
+
+// 行注释：一行注释对应下面多行代码，写在代码块上方
+// 乘以敏感度再叠加，clamp 确保结果始终在 [-1, 1]，超出范围会导致后续衰减计算溢出
+currentPAD.P = clamp(currentPAD.P + delta.P * SENSITIVITY, -1, 1)
+currentPAD.A = clamp(currentPAD.A + delta.A * SENSITIVITY, -1, 1)
+currentPAD.D = clamp(currentPAD.D + delta.D * SENSITIVITY, -1, 1)
+```
+
+#### 必须写注释的情况
+
+**魔法数字和魔法字符串**——注释说明含义和取值理由：
 
 ```typescript
 const DECAY_LAMBDA = 0.1          // 情绪衰减系数，0.1 约等于 1 小时后情绪减半
 const FUZZY_THRESHOLD = 0.2       // 记忆保持概率低于此值时进入「模糊状态」
-const SIMILARITY_THRESHOLD = 0.85 // 余弦相似度超过此值认为是相似记忆，触发混淆
+const SIMILARITY_THRESHOLD = 0.85 // 余弦相似度超过此值认为是相似记忆，触发混淆机制
 ```
 
-**3. 坑点注释——看起来奇怪但有原因的代码**
+**坑点注释**——看起来奇怪但有原因，注释说明删掉会发生什么：
 
 ```typescript
 await delay(200)    // LLM API 有限流，连续请求必须间隔，去掉会概率性 429
 connection.close()  // 同一 hand_name 重复连接必须关掉旧的，否则两边都会收到重复消息
 ```
 
-**4. 复杂公式或算法**
+**复杂公式和算法**——注释说明来源和参数含义：
 
 ```typescript
-// 艾宾浩斯遗忘曲线：P = e^(-t/S)，t 为存储时长（小时），S 为记忆强度 [0,1]
+// 艾宾浩斯遗忘曲线：P = e^(-t/S)
+// t = 存储时长（小时），S = 记忆强度 [0,1]，S 越大遗忘越慢
 const retentionProb = Math.exp(-hoursPassed / memory.strength)
-
-// PAD 情绪指数衰减：向 baseline 靠拢，factor = e^(-λt)
-const factor = Math.exp(-DECAY_LAMBDA * minutesPassed)
 ```
 
-**5. 文件头注释（每个文件必须有）**
+**非显而易见的业务逻辑**：
 
 ```typescript
-// emotion-engine.ts
-// 负责穗穗的 PAD 三维情感状态管理：读取、更新（对话触发）、衰减（定时任务）
-// 对外导出：getCurrentState() / applyDelta() / setPAD() / decay()
+// 穗穗的记忆不会直接消失，而是进入「模糊状态」让她说「有点记不清了」
+// 比直接删除记忆更贴近人类的遗忘行为
+if (retentionProb < FUZZY_THRESHOLD) memory.status = "fuzzy"
 ```
 
-**较长函数用段落注释分区：**
+**较长函数用段落标题分区**：
 
 ```typescript
 async function handleMessage(message: IncomingMessage) {
@@ -1521,10 +1524,10 @@ async function handleMessage(message: IncomingMessage) {
 
   // —— 查询引擎状态 ——
   const emotion = await emotionEngine.getCurrentState()
-  const memory = await memoryEngine.getContext(content)
+  const memory  = await memoryEngine.getContext(content)
 
   // —— 调用 LLM ——
-  const prompt = buildSystemPrompt(emotion, memory)
+  const prompt    = buildSystemPrompt(emotion, memory)
   const llmResult = await callLLM(prompt, content)
 
   // —— 更新状态并下发回复 ——
@@ -1534,180 +1537,188 @@ async function handleMessage(message: IncomingMessage) {
 }
 ```
 
+禁止写重复代码字面意思的废话注释：`i = i + 1  // i 加 1`。
+
 ---
 
 ### 6.4 函数规范
 
-每个函数聚焦单一职责，长度以 **4–15 行**为甜区。
+#### 固定结构顺序
 
-用**卫语句（Early Return）**把异常情况先处理掉，主逻辑写在最后，缩进保持在两层以内：
+```
+① 函数头注释（自然语言，说清楚做什么、怎么用、注意事项）
+② 卫语句（Early Return，每条加注释说明原因）
+③ 空一行（视觉上明确区分卫语句和主逻辑）
+④ 读取数据 / 处理逻辑 / 修改数据
+⑤ 反馈 / 返回结果
+```
 
 ```typescript
-// ✅ 卫语句版本
-function sendChat(content: string, userId: string) {
-  if (!content) return
-  if (!userId) return
-  if (!isConnected) {
-    console.warn("未连接 Core，消息丢弃")
-    return
-  }
-
-  ws.send(buildChatMessage(content, userId))
-}
-
-// ❌ 嵌套版本
-function sendChat(content: string, userId: string) {
-  if (content) {
-    if (userId) {
-      if (isConnected) {
-        ws.send(buildChatMessage(content, userId))
-      }
-    }
-  }
-}
-```
-
----
-
-### 6.5 文件与目录规范
-
-文件组织**遵循 TypeScript 社区标准规范**，按功能模块分层：
-
-```
-suicore/
-├── core/
-│   ├── index.ts              // Core 主控入口
-│   ├── message-handler.ts    // 消息处理逻辑
-│   └── prompt-builder.ts     // System Prompt 组装
-├── engines/
-│   ├── emotion-engine.ts     // PAD 情感引擎
-│   ├── memory-engine.ts      // 记忆管理
-│   └── reflect-engine.ts     // 自我审视引擎
-├── managers/
-│   ├── hand-manager.ts       // Hand 连接管理
-│   └── tool-manager.ts      // Tool 调度管理
-├── tools/
-│   ├── weather-search.ts
-│   └── calendar.ts
-├── types/
-│   └── index.ts              // 全局类型定义
-└── utils/
-    └── index.ts              // 通用工具函数
-```
-
-文件名 kebab-case，名称直接说明内容，不用缩写。
-
----
-
-### 6.6 性能与视觉规范
-
-**性能优先级高于视觉，这是不可妥协的原则。**
-
-#### 允许的「少量性能换视觉」
-
-```typescript
-// ✅ 日志可读性提升明显，且只在非热路径执行
-console.log(`情绪：P=${pad.P.toFixed(2)}, A=${pad.A.toFixed(2)}, D=${pad.D.toFixed(2)}`)
-
-// ✅ 调试日志格式化输出
-console.log(JSON.stringify(state, null, 2))
-```
-
-#### 禁止的「为视觉牺牲性能」
-
-```typescript
-// ❌ 热路径里深拷贝只为日志好看
-const snapshot = JSON.parse(JSON.stringify(currentPAD))
-
-// ❌ 每次消息触发全量重渲染
-messages.forEach(m => reRenderAll(m))
-
-// ❌ 在 LLM 路径上做无人查看的格式化
-const prettyPrompt = formatPromptForDisplay(prompt)
-await callLLM(prettyPrompt)
-```
-
-#### SuiBot 热路径（严禁非必要操作）
-
-- `handleMessage()` 主流程
-- `buildSystemPrompt()` 组装过程
-- `callLLM()` 调用链路
-- `emotionEngine.applyDelta()` 情绪更新
-
-热路径以外（日志、WebUI 渲染、调试命令）可适当用性能换可读性。
-
----
-
-### 6.7 复用规范
-
-**遵循标准工程规范：**
-
-- 能预见到会被多处调用的工具函数，提前提取到 `utils/index.ts`
-- 同一模块内部复用的逻辑，提取为私有函数（不导出）
-- 跨模块复用的类型定义，统一放在 `types/index.ts`
-- 业务逻辑不做「万能函数」，一个函数解决一类问题
-
-```typescript
-// utils/index.ts —— 项目通用工具
-
-// 把数值限制在 [min, max] 范围内，PAD 计算、UI 进度条等多处会用到
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-// 等待指定毫秒，用于限流控制
-export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-// 生成 UUID v4，用于 msg_id 生成
-export function generateId(): string {
-  return crypto.randomUUID()
-}
-```
-
----
-
-### 6.8 SuiBot 项目落地示例
-
-以 `emotion-engine.ts` 为例，展示规范在项目中的实际应用：
-
-```typescript
-// emotion-engine.ts
-// 负责穗穗的 PAD 三维情感状态管理：读取、更新（对话触发）、衰减（定时任务）
-// 对外导出：getCurrentState() / applyDelta() / setPAD() / decay()
-
-import { PADVector, EmotionState } from "../types"
-import { clamp } from "../utils"
-
-// 情绪衰减系数，0.1 约等于 1 小时后情绪减半，可通过 config_set 动态调整
-const DECAY_LAMBDA = 0.1
-// 情感敏感度：1.2 表示穗穗比默认值稍敏感，更易产生情绪波动
-const SENSITIVITY = 1.2
-// 情绪稳态，来自 character.json，情绪衰减后趋向此值
-const BASELINE_PAD: PADVector = { P: 0.1, A: -0.2, D: 0.0 }
-
-let currentPAD: PADVector = { ...BASELINE_PAD }
-
-
-export function getCurrentState(): EmotionState {
-  return {
-    pad: { ...currentPAD },
-    label: getEmotionLabel(currentPAD),
-  }
-}
-
-
+/** 把一次对话的情绪影响叠加进来。delta 由 LLM 返回，SENSITIVITY 放大穗穗的情绪反应。 */
 export function applyDelta(delta: PADVector): void {
+  if (!delta) return  // 没有情绪变化就不处理
+
   // 乘以敏感度再叠加，clamp 确保不超出 [-1, 1]，否则衰减计算会溢出
   currentPAD.P = clamp(currentPAD.P + delta.P * SENSITIVITY, -1, 1)
   currentPAD.A = clamp(currentPAD.A + delta.A * SENSITIVITY, -1, 1)
   currentPAD.D = clamp(currentPAD.D + delta.D * SENSITIVITY, -1, 1)
 }
+```
+
+#### 长度与拆分
+
+- **4–16 行**为甜区，超出考虑拆分
+- 提前返回的简单判断写成紧凑一行：`if (!nodes.length) return []`
+- 只有当一整块逻辑形成独立语义、拆出来后更容易理解时才拆
+- **禁止**拆成少于 3 行或只用一次的碎片函数
+
+---
+
+### 6.5 文件与目录规范
+
+严格对应项目实际目录结构（见第一章 1.3）：
+
+```
+suibot/
+├── core/                   # 触发→指令链条的核心调度
+│   ├── index.ts
+│   ├── message-handler.ts  # 五步主流程，调用引擎和 Tool Manager
+│   └── prompt-builder.ts   # System Prompt 组装，纯函数
+├── engines/                # 数据层：所有状态读写都在这里，Core 直接调用
+│   ├── emotion-engine.ts   # PAD 三维情感
+│   ├── memory-engine.ts    # 短期 Buffer + 长期 ChromaDB
+│   ├── reflect-engine.ts   # 自我审视 → 更新 Prompt
+│   └── priority-engine.ts  # 优先级队列 + 路由规则
+├── tools/                  # Tool 实现（一文件一 Tool）
+│   ├── tool-manager/       # Tool Manager，经 Core 指令触发后调度 Tool
+│   └── tools/              # 外部 Tool 落地目录（git-ignored）
+├── hands/                  # Hand 适配层
+│   ├── hand-manager/       # Hand Manager，经 Core 指令触发后管理连接
+│   └── hands/              # 外部 Hand 落地目录（git-ignored）
+├── types/
+│   └── index.ts            # 全局类型定义，所有文件共享
+└── utils/                  # 无业务身份的纯工具，拿到别的项目也能用
+    ├── math.ts             # clamp、normalize
+    ├── async.ts            # delay、retry
+    └── id.ts               # generateID（注意：ID 大写）
+```
+
+**关键规则：**
+- 业务模块里**禁止出现工具函数**，发现了立即提取到 `utils/` 下对应文件
+- `utils/` 只放真正通用、拿到别的项目也能用的函数
+- 文件名 kebab-case，名称直接说明内容，不用缩写
+
+---
+
+### 6.6 性能与视觉规范
+
+**热路径性能优先，其他地方可读性优先。**
+
+SuiBot 热路径（严禁非必要操作）：`handleMessage()`、`buildSystemPrompt()`、`callLLM()`、`applyDelta()`
+
+```typescript
+// ✅ 允许：非热路径的日志格式化，可读性收益明显
+console.log(`情绪：P=${pad.P.toFixed(2)}, A=${pad.A.toFixed(2)}, D=${pad.D.toFixed(2)}`)
+
+// ❌ 禁止：热路径里深拷贝只为日志好看
+const snapshot = JSON.parse(JSON.stringify(currentPAD))
+
+// ❌ 禁止：LLM 路径上做无人查看的格式化
+const prettyPrompt = formatPromptForDisplay(prompt)
+await callLLM(prettyPrompt)
+```
+
+---
+
+### 6.7 复用规范
+
+- **第一次出现的逻辑优先就地写**，保持上下文完整可读
+- 同样逻辑稳定出现**两次及以上**再提取
+- **禁止**提前为「可能复用」而抽象，等需求真实出现再处理
+- 提取前提：提取后更容易理解、搜索、修改
+
+---
+
+### 6.8 架构规范：纯函数优先，组合优于继承
+
+#### 纯函数优先
+
+纯函数：相同输入永远返回相同输出，不读写任何外部状态：
+
+```typescript
+// ✅ 纯函数：可独立测试，行为完全可预测
+export function calcDecay(current: PADVector, baseline: PADVector, minutes: number): PADVector {
+  const factor = Math.exp(-DECAY_LAMBDA * minutes)  // 衰减因子 e^(-λt)
+  return {
+    P: baseline.P + (current.P - baseline.P) * factor,
+    A: baseline.A + (current.A - baseline.A) * factor,
+    D: baseline.D + (current.D - baseline.D) * factor,
+  }
+}
+
+// 副作用隔离到边界：只有这一行修改状态，其余都是纯计算
+let _state: PADVector = { ...BASELINE_PAD }
+export function decay(minutes: number): void {
+  _state = calcDecay(_state, BASELINE_PAD, minutes)
+}
+```
+
+#### 组合优于继承
+
+依赖通过参数显式传入，不通过 `this` 或继承链隐式传递。
+只在以下情况使用类：状态与行为强绑定、实现第三方接口、管理生命周期资源。
+
+---
+
+### 6.9 落地示例：emotion-engine.ts
+
+完整展示以上所有规范在项目中的实际应用：
+
+```typescript
+// emotion-engine.ts
+//
+// 管穗穗的情绪状态。情绪用 PAD 三维坐标表示（愉悦度/激活度/支配度，各在 [-1,1]）。
+// 每次对话叠加情感波动，同时随时间指数衰减回基准值，模拟人类情绪的自然消退。
+//
+// 调用示例：
+//   const state = getCurrentState()          // { pad: {...}, label: "轻松愉快" }
+//   applyDelta({ P: 0.3, A: 0.1, D: 0.0 })  // 叠加一次对话带来的情绪变化
+//   decay(30)                                // 经过 30 分钟后的情绪衰减
+//   setPAD({ P: 0.5, A: 0.3, D: 0.0 })      // 手动设置（调试 / 剧本模式）
+
+import { PADVector, EmotionState } from "../types"
+import { clamp } from "../utils/math"
+
+const DECAY_LAMBDA = 0.1           // 情绪衰减系数，0.1 约等于 1 小时后情绪减半
+const SENSITIVITY  = 1.2           // 情感敏感度，1.2 让穗穗比普通值稍敏感，更易波动
+const BASELINE_PAD: PADVector = { P: 0.1, A: -0.2, D: 0.0 }  // 稳态，来自 character.json
+
+let _state: PADVector = { ...BASELINE_PAD }  // 当前情绪，模块私有，只通过导出函数读写
 
 
+/** 获取当前情绪状态，Core 在组装 Prompt 前调用。 */
+export function getCurrentState(): EmotionState {
+  return {
+    pad:   { ..._state },               // 拷贝一份防止外部直接修改内部状态
+    label: getEmotionLabel(_state),
+  }
+}
+
+
+/** 叠加一次对话的情绪影响，Core 在 LLM 返回后调用。delta 由 LLM 判断并返回。 */
+export function applyDelta(delta: PADVector): void {
+  if (!delta) return  // LLM 没有返回情绪变化时跳过
+
+  // 乘以敏感度再叠加，clamp 确保不超出 [-1, 1]，超出会导致衰减计算溢出
+  _state.P = clamp(_state.P + delta.P * SENSITIVITY, -1, 1)
+  _state.A = clamp(_state.A + delta.A * SENSITIVITY, -1, 1)
+  _state.D = clamp(_state.D + delta.D * SENSITIVITY, -1, 1)
+}
+
+
+/** 手动设置情绪值，供 WebUI 的 emotion_set 指令和调试模式使用。 */
 export function setPAD(pad: PADVector): void {
-  currentPAD = {
+  _state = {
     P: clamp(pad.P, -1, 1),
     A: clamp(pad.A, -1, 1),
     D: clamp(pad.D, -1, 1),
@@ -1715,65 +1726,32 @@ export function setPAD(pad: PADVector): void {
 }
 
 
-export function decay(minutesPassed: number): void {
-  // 指数衰减公式：E_new = baseline + (E_current - baseline) * e^(-λt)
-  const factor = Math.exp(-DECAY_LAMBDA * minutesPassed)
-  currentPAD.P = BASELINE_PAD.P + (currentPAD.P - BASELINE_PAD.P) * factor
-  currentPAD.A = BASELINE_PAD.A + (currentPAD.A - BASELINE_PAD.A) * factor
-  currentPAD.D = BASELINE_PAD.D + (currentPAD.D - BASELINE_PAD.D) * factor
+/** 情绪随时间衰减，定时任务每分钟调用一次。minutes 为距上次调用的时间间隔。 */
+export function decay(minutes: number): void {
+  _state = calcDecay(_state, BASELINE_PAD, minutes)
 }
 
 
-// 把 PAD 数值映射为可读的中文标签，用于日志和 WebUI 展示
+// 纯函数：计算衰减后的新状态，不修改任何外部变量，可独立测试
+// 公式：E_new = baseline + (E_current - baseline) * e^(-λt)
+function calcDecay(current: PADVector, baseline: PADVector, minutes: number): PADVector {
+  const factor = Math.exp(-DECAY_LAMBDA * minutes)  // 衰减因子，越小说明时间越久情绪消退越多
+  return {
+    P: baseline.P + (current.P - baseline.P) * factor,
+    A: baseline.A + (current.A - baseline.A) * factor,
+    D: baseline.D + (current.D - baseline.D) * factor,
+  }
+}
+
+
+// 把 PAD 数值映射为中文标签，用于日志和 WebUI 展示，不对外导出
 function getEmotionLabel(pad: PADVector): string {
-  if (pad.P > 0.5 && pad.A > 0.3)  return "兴奋愉快"
-  if (pad.P > 0.2 && pad.A <= 0.3) return "轻松愉快"
-  if (pad.P < -0.3 && pad.A > 0.3) return "焦虑不安"
-  if (pad.P < -0.3 && pad.A <= 0)  return "低落沉闷"
+  if (pad.P > 0.5 && pad.A > 0.3)  return "兴奋愉快"  // 又开心又激动
+  if (pad.P > 0.2 && pad.A <= 0.3) return "轻松愉快"  // 开心但比较平静
+  if (pad.P < -0.3 && pad.A > 0.3) return "焦虑不安"  // 难受且紧张
+  if (pad.P < -0.3 && pad.A <= 0)  return "低落沉闷"  // 难受且没精神
   return "平静中性"
 }
-```
-
----
-
-### 6.9 给 AI 的提示词（直接复制使用）
-
-将以下内容复制到 Cursor / Trae / Roo Code 的「规则」或「自定义指令」中，与项目根目录的 `claude.md` 配合使用：
-
-```
-# SuiBot 项目编码规范
-
-- 变量和函数：camelCase（小驼峰），如 currentPAD、applyDelta
-- 类、接口、类型：PascalCase（大驼峰），如 EmotionEngine、PADVector
-- 模块级常量：SCREAMING_SNAKE_CASE，如 DECAY_LAMBDA、MAX_RETRY
-- 文件名：kebab-case，如 emotion-engine.ts、hand-manager.ts
-- 命名要直觉，但规范优先，不能为了「好理解」破坏大小写规则
-
-- 不用每一行都写注释，以下情况必须写：
-  1. 非显而易见的业务逻辑
-  2. 魔法数字和魔法字符串，必须注释说明含义和取值理由
-  3. 看起来奇怪但有原因的代码（限流延迟、特殊顺序等），注释说明删掉会发生什么
-  4. 复杂公式和算法，注释说明公式来源和参数含义
-  5. 每个文件头部必须有注释说明这个文件负责什么、对外暴露哪些接口
-- 较长函数用「// —— 段落名 ——」做区块分隔，方便扫读
-- 禁止写重复代码字面意思的废话注释
-
-- 单一职责，4–15 行为甜区，超出考虑拆分
-- 用卫语句（Early Return）把所有异常先处理，主逻辑写在最后
-- 缩进控制在两层以内
-
-- 按功能模块分层，遵循 TypeScript 社区标准目录结构
-- 文件名 kebab-case，名称直接说明内容
-- 类型定义集中在 types/index.ts，通用工具集中在 utils/index.ts
-
-- 性能优先级高于视觉，不可妥协
-- 可以在非热路径（日志、调试、WebUI 渲染）用少量性能换可读性
-- 禁止在热路径（handleMessage、buildSystemPrompt、callLLM、applyDelta）做任何非必要计算或 I/O
-- 禁止为视觉效果在热路径做深拷贝、全量重渲染、非必要字符串格式化
-
-- 遵循标准工程规范：能预见多处使用的工具函数，提前提取到 utils/
-- 跨模块复用的类型统一放 types/
-- 业务逻辑不做万能函数，一个函数解决一类问题
 ```
 
 ## 附录 A：组织仓库总览
@@ -1825,5 +1803,5 @@ function getEmotionLabel(pad: PADVector): string {
 
 ---
 
-*SuiBot 正式框架文档 v3.4 · Sui-with-u 版权所有 · CC BY-NC-ND 4.0*
+*SuiBot 正式框架文档 v3.4 · Sui-with-u 版权所有*
 *夜来南风起，小麦覆陇黄。*
