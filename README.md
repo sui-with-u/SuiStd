@@ -2,7 +2,19 @@
 
 > 适用于所有 AI 辅助开发（Cursor、Trae、Roo Code 等 Vibe Coding 工具）。
 > 基于 UOP（面向理解编程）与 HOP（面向人类编程）整合修订，结合 SuiBot 项目实际。
-> 与项目框架文档 `SuiBot_FRAMEWORK.md` 配合使用。
+>
+> **SuiStd 是编码规范的唯一真源**。其他仓库不要再复制本文档全文——规范改一次要改 N 处，
+> 必然漂移。需要引用时请指向本仓库。
+
+---
+
+## 本仓库文档
+
+| 文档 | 定位 |
+|------|------|
+| [`SuiBot_FRAMEWORK.md`](SuiBot_FRAMEWORK.md) | 框架概述：**要做什么**。架构、五步流程、协议规范、引擎设计 |
+| [`SuiBot_ENGINEERING.md`](SuiBot_ENGINEERING.md) | 工程优化：**怎么把它做扎实**。插件契约、扩展点、仓库分布、执行记录 |
+| 本文档 | 编码规范：**代码怎么写**。命名、注释、函数、视觉规则 |
 
 ---
 

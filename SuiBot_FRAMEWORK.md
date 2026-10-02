@@ -7,6 +7,29 @@
 
 ---
 
+## 📌 阅读须知：本文档是「设计稿」，不是「验收单」
+
+本文档描述**目标形态**。代码实现进度以
+[`SuiBot_ENGINEERING.md`](SuiBot_ENGINEERING.md) 第五章「执行记录」为准——
+那一章只记录**经过实测验证**的事实，并明确区分「已可用」与「未完成」。
+
+已知的「文档已承诺、代码尚未实现」项（截至 2026.10）：
+
+| 框架文档承诺 | 实现状态 |
+|---|---|
+| 五步主流程、四引擎、Hand/Tool Manager、WS 协议 | ✅ 已实现 |
+| 心跳检测（30s ping / 10s pong / 3 次断连） | ✅ 已实现（注意：Core 发包是 **JSON** 格式 `{"type":"ping"}`） |
+| 优先级队列（PPP/P0/P1/P2/P3） | ✅ 已实现（插队） |
+| **PPP 级消息「打断」当前轮次** | ⚠️ **仅实现插队，未实现中断**（见 2.2 与 ENGINEERING 第六章 P3） |
+| **Self-Reflection 写回 `character.current_state`** | ⚠️ **未实现**：自我描述只进 System Prompt，未回写角色档案（见 4.3） |
+| 长期记忆存 ChromaDB | ⚠️ **当前为内存实现**，靠 `data/state.json` 快照存活过重启 |
+| 配置热重载（`config_set` 立即生效） | ⚠️ **未实现**：改了要重启 Core |
+| 多角色（一个进程演多个角色） | ⚠️ **未实现**：一个 Core 进程只有一组全局 PAD + 一份角色档案 |
+
+「⚠️」不等于设计有问题，而是**还没做完**——列出它们是为了避免把设计稿当成现有能力使用。
+
+---
+
 ## 目录
 
 - [引言：为什么要重构](#引言为什么要重构)
@@ -832,7 +855,7 @@ MMVP 阶段 ChromaDB 的黑盒导致无法验证记忆是否正常工作。v2 �
 | `bio` | 固定身份锚点，不随性格演化改变 |
 | `homeostasis.baseline_pad` | 情绪稳态坐标：[0.1, -0.2, 0.0] = 轻微愉悦、偏低激活、中性支配 |
 | `homeostasis.sensitivity` | 情感敏感度，1.2 表示比默认值稍敏感，更易产生情绪波动 |
-| `current_state` | 由 Self-Reflection Engine 写入，每次审视后更新 |
+| `current_state` | **应由** Self-Reflection Engine 写入。⚠️ 当前实现：自我描述经 `getSelfDescription()` 直接进 System Prompt，**尚未回写此字段**；`character_update` 可手动设置 |
 
 ---
 
