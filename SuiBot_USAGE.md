@@ -204,7 +204,7 @@ WebUI 侧直接 `cd H-SuiWeb && bun run dev` 即可。
 | **改配置要重启 Core** | WebUI 保存的 API Key 不热生效 | 用 `DEEPSEEK_API_KEY` 环境变量 |
 | **`config.json` 里 `core.decay_lambda` / `core.sensitivity` 无效** | 改了不影响情绪 | 否，常量写死在 `emotion-engine.ts` |
 | **长期记忆不落 ChromaDB** | `CHROMA_URL` 只影响启动日志 | 记忆靠 `data/state.json` 快照存活 |
-| **一个 Core 进程只有一个角色** | 不能同时演多个不同人设 | 起多个 Core 实例（不同端口 + 不同角色档案） |
+| **`Core = 一个角色`（设计约定，非限制）** | 一个 Core 进程只演一个角色 | **不是问题**：要 N 个人设就起 N 个 Core 实例（各配 `character.json` 与端口），平台按端点清单分别连接。智能体因此与平台解耦 |
 | **PPP 只插队不抢占** | 不能打断正在处理的那一轮 | 否，未实现 |
 | **自我描述不写回 `character.current_state`** | 只进 System Prompt | 可用 `character_update` 手动设 |
 | **`permissions` 仅审计** | 无沙箱，Hand 是任意代码 | 否，未实现 |

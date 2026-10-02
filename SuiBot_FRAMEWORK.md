@@ -24,7 +24,7 @@
 | **Self-Reflection 写回 `character.current_state`** | ⚠️ **未实现**：自我描述只进 System Prompt，未回写角色档案（见 4.3） |
 | 长期记忆存 ChromaDB | ⚠️ **当前为内存实现**，靠 `data/state.json` 快照存活过重启 |
 | 配置热重载（`config_set` 立即生效） | ⚠️ **未实现**：改了要重启 Core |
-| 多角色（一个进程演多个角色） | ⚠️ **未实现**：一个 Core 进程只有一组全局 PAD + 一份角色档案 |
+| ~~多角色（一个进程演多个角色）~~ | ✅ **不是缺陷，是设计约定**：`Core = 一个角色`。要接入 N 个人设就起 N 个 Core 实例（各配 `character.json` 与端口），由平台按端点清单分别连接。详见 `SuiBot_ENGINEERING.md` 4.1.3 |
 
 「⚠️」不等于设计有问题，而是**还没做完**——列出它们是为了避免把设计稿当成现有能力使用。
 
@@ -195,8 +195,39 @@ suibot/                             ← 主仓库，标准部署的全部内容
 
 | 前缀 | 类型 | 示例 |
 |------|------|------|
-| `H-` | Hand | `H-SuiWeb`、`H-SuiDevWeb`、`H-OneBot`、`H-Telegram`、`H-Minecraft` |
+| `H-` | Hand | `H-SuiWeb`、`H-SuiArena`、`H-SuiDevWeb`、`H-OneBot`、`H-Telegram`、`H-Minecraft` |
 | `T-` | Tool | `T-TTS`、`T-Weather`、`T-Calendar` |
+
+#### 关键约定：`Core = 一个角色`
+
+**一个 Core 进程 = 一个角色。** 一组全局 PAD 状态 + 一份 `character.json` + 一条 WS 端口。
+
+这不是限制，而是设计。由此推出：
+
+- **要接入 N 个不同人设的智能体，就起 N 个 Core 实例**，各配一份角色档案与端口
+- 智能体与平台**完全解耦**：平台不需要知道智能体内部怎么实现情绪与记忆
+- 任何实现 SuiBot WS 协议的智能体都能被接入，不限于 SuiBot 自家的 Core
+
+这使 SuiBot 生态可以承载**多智能体平台**类场景。典型例子是
+[H-SuiArena](https://github.com/sui-with-u/H-SuiArena)（赛博图灵博弈）：
+真人玩家与多个 AI 同处一个匿名聊天室，每个 AI 是独立的一个 Core 实例。
+
+```
+┌──────────────────────────────────────────────┐
+│        平台类 Hand（如 H-SuiArena）           │
+│  入场 / 房间 / 回合 / 投票 / 界面              │
+└────┬──────────────┬──────────────┬───────────┘
+     │ WS           │ WS           │ WS
+┌────▼─────┐   ┌────▼─────┐   ┌───▼──────┐
+│ SuiBot   │   │ Astro Bot│   │ 其他智能体│
+│ Core     │   │ Core     │   │ ...      │
+│ 角色=穗穗 │   │ 角色=Astro│   │          │
+└──────────┘   └──────────┘   └──────────┘
+```
+
+**平台侧需要提供的**：一份**智能体端点清单**（每个 AI 叫什么、连哪个 Core URL、
+是否由平台代管进程与角色档案）+ 按清单建立 WS 连接。
+**不需要**在 Core 内部引入「角色」维度。
 
 每个独立仓库包含自己的 `package.json`、`index.ts` 入口，以及一个 `sui.config.json` 描述文件，供 Manager 识别和注册：
 
