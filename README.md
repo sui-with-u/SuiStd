@@ -12,9 +12,14 @@
 
 | 文档 | 定位 |
 |------|------|
-| [`SuiBot_FRAMEWORK.md`](SuiBot_FRAMEWORK.md) | 框架概述：**要做什么**。架构、五步流程、协议规范、引擎设计 |
+| [`SuiBot_USAGE.md`](SuiBot_USAGE.md) | 使用与验收：**怎么用、怎么验**。快速上手、验收清单、已知限制、FAQ |
 | [`SuiBot_ENGINEERING.md`](SuiBot_ENGINEERING.md) | 工程优化：**怎么把它做扎实**。插件契约、扩展点、仓库分布、执行记录 |
+| [`SuiBot_FRAMEWORK.md`](SuiBot_FRAMEWORK.md) | 框架概述：**要做什么**。架构、五步流程、协议规范、引擎设计（设计稿） |
 | 本文档 | 编码规范：**代码怎么写**。命名、注释、函数、视觉规则 |
+
+> **阅读顺序建议**：新接触项目先读 `SuiBot_USAGE.md`（能跑起来、知道怎么验收），
+> 再读 `SuiBot_ENGINEERING.md`（了解工程约束与未完成项），
+> 然后按需查 `SuiBot_FRAMEWORK.md`（设计全貌）。
 
 ---
 
